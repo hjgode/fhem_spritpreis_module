@@ -845,3 +845,34 @@ Spritpreis_ParseCoordinatesForAddress(@){
 #
 #####################################
 1;
+
+=pod
+=item device
+=item summary Controls some features of AVM's Fritz!Box, FRITZ!Repeater and Fritz!Fon.
+=item summary_DE Steuert einige Funktionen von AVM's Fritz!Box, Fritz!Repeater und Fritz!Fon.
+
+=begin html
+
+<a name="Spritpreis"></a>
+<h3>Spritpreis</h3>
+<div> 
+<ul>
+<li>No help yet</li>
+</ul>
+</div>
+
+=end html
+
+=begin html_DE
+
+<a name="Spritpreis"></a>
+<h3>Spritpreis</h3>
+<div> 
+<ul>
+<li>Noch keine Hilfe</li>
+</ul>
+</div>
+
+=end html_DE
+
+=cut--
