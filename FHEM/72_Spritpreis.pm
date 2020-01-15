@@ -3,7 +3,7 @@
 
 # v0.0: inital testing
 # v0.1: basic functionality for pre-configured Tankerkoenig IDs
-
+# v0.2: removed unused, unsupported use of usleep and nanosleep hjgode
 
 package main;
  
@@ -11,7 +11,7 @@ use strict;
 use warnings;
 
 use Time::HiRes;
-use Time::HiRes qw(usleep nanosleep);
+#use Time::HiRes qw(usleep nanosleep);
 use Time::HiRes qw(time);
 use JSON::XS;
 use URI::URL;
