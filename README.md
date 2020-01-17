@@ -1,11 +1,18 @@
 # Spritpreismodule.pm
+>mod by hjgode
+
 an experimental module to provide fuel price updates from various apis
 my main motivation to start this is to gain some experience writing fhem modules from scratch.
 it's not primarily thought of as a production ready module and things may vary. a lot.
 
 ### Installation
-for now, copy 72_Spritpreis.pm to /opt/fhem/FHEM 
+####Manually
+copy 72_Spritpreis.pm to /opt/fhem/FHEM 
 then restart fhem
+
+####Automatic
+
+    update all https://raw.githubusercontent.com/hjgode/fhem_spritpreis_module/master/controls_spritpreis.txt
 
 ### Contributions
 Contributions are welcome

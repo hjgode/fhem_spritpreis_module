@@ -1,10 +1,9 @@
 ##############################################
-# $Id: 72_Spritpreis.pm 0 2020-01-17 11:27:56Z hjgode $
-# DEL ./FHEM/72_Spritpreis.pm
-# UPD 2020-01-17_11:27:56 36031 FHEM/72_Spritpreis.pm
+# $Id: 72_Spritpreis.pm 0 2017-01-10 12:00:00Z pjakobs $
+
 # v0.0: inital testing
 # v0.1: basic functionality for pre-configured Tankerkoenig IDs
-# v0.2: added help file and removed unneeded use(usleep,nanosleep)
+
 
 package main;
  
@@ -18,6 +17,8 @@ use JSON::XS;
 use URI::URL;
 use Data::Dumper;
 require "HttpUtils.pm";
+
+use Scalar::Util 'looks_like_number';
 
 $Data::Dumper::Indent = 1;
 $Data::Dumper::Sortkeys = 1;
@@ -186,29 +187,60 @@ Spritpreis_Set(@) {
 sub
 Spritpreis_Get(@) {
     my ($hash, $name, $cmd, @args) = @_;
+    Log3($hash, 5, "*** GET called with ".Dumper(@_));
 
+    # possible add number test: if($s =~ /^[0-9,.E]+$/)
+    my $ret='';
+    my @loc;
     return "Unknown command $cmd, choose one of search test" if ($cmd eq '?');
-    Log3($hash, 3,"$hash->{NAME}: get $hash->{NAME} $cmd $args[0]");
+
 
     if ($cmd eq "search"){
+        my $lat;
+        my $lon;
+        my $rad;
+    
+        #now fill with args
+        ($lat, $lon, $rad)=@args;
+        
+#        $lat=AttrVal($hash->{'NAME'}, "lat",0) if(isDefNumber($lat));
+#        $lon=AttrVal($hash->{'NAME'}, "lon",0) if(isDefNumber($lon));
+#        $rad=AttrVal($hash->{'NAME'}, "rad",0) if(isDefNumber($rad));
+    
+#        if( ! isDefNumber($lat) || ! ! isDefNumber($lon) || ! isDefNumber($rad) ){
+#          return "please use search with lat, lon and rad value. For example: 52.033 8.750 5";
+#        }
+        Log3($hash, 3,"++++ $hash->{NAME}: get $hash->{NAME} $cmd lat=". $lat .", lon=".$lon.", rad=".$rad);
+
         my $str='';
         my $i=0;
-        while($args[$i++]){
+        while($i <= $#args){
             $str=$str." ".$args[$i];
+            $i++;
         }
         Log3($hash,4,"$hash->{NAME}: search string: $str");
-        my @loc=Spritpreis_GetCoordinatesForAddress($hash, $str);
-        my ($lat, $lng, $str)=@loc;
-        if($lat==0 && $lng==0){
+        
+        if($lat!=0 && $lon!=0 && $rad!=0){
+          Log3($hash,4,"$hash->{NAME}: Calling GetStationIDsForLocation with $lat, $lon, $rad");
+          @loc=($lat, $lon, $rad);#=@loc; #store vals in array
+          $ret=Spritpreis_Tankerkoenig_GetStationIDsForLocation($hash, @loc);
+          return $ret;
+        }
+        else{
+          @loc=Spritpreis_GetCoordinatesForAddress($hash, $str);
+          my ($lat, $lon, $str)=@loc;
+        }
+        
+        if($lat==0 && $lon==0){
             return $str;
         }else{
             if($hash->{helper}->{service} eq "Tankerkoenig"){
-                my $ret=Spritpreis_Tankerkoenig_GetStationIDsForLocation($hash, @loc);
+                $ret=Spritpreis_Tankerkoenig_GetStationIDsForLocation($hash, @loc);
                 return $ret;
             }
         }
     }elsif($cmd eq "test"){
-            my $ret=Spritpreis_Tankerkoenig_populateStationsFromAttr($hash);
+            $ret=Spritpreis_Tankerkoenig_populateStationsFromAttr($hash);
             return $ret;
 
     }else{
@@ -454,7 +486,7 @@ Spritpreis_Spritpreisrechner_updatePricesForLocation(@){
         }
     };
     my ($err,$data)=HttpUtils_BlockingGet($param);
-    Log3($hash,5,"$hash->{'NAME'}: Dumper($data)");
+    Log3($hash,5,"$hash->{'NAME'}: ".Dumper($data));
     return undef;
 }
 
@@ -464,18 +496,23 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
    # This is currently not being used. The idea is to provide a lat/long location and a radius and have
    # the stations within this radius are presented as a list and, upon selecting them, will be added
    # to the readings list
+   # example get search 52.033 8.750 5
    #
-   my ($hash,@location) = @_;
-
-   # my $lat=AttrVal($hash->{'NAME'}, "lat",0);
-   # my $lng=AttrVal($hash->{'NAME'}, "lon",0);
-   my $rad=AttrVal($hash->{'NAME'}, "rad",5);
+   my ($hash, @loc) = @_;
+   #Log3($hash,5,"$hash->{'NAME'}: ++++ GetStationIDsForLocation: dumper:".Dumper(@_));
+    my ($lat, $lng, $rad)=@loc;
+    
+#    my $lat=AttrVal($hash->{'NAME'}, "lat",0);
+#    my $lng=AttrVal($hash->{'NAME'}, "lon",0);
+#    my $rad=AttrVal($hash->{'NAME'}, "rad",5);
+    
    my $type=AttrVal($hash->{'NAME'}, "type","all");
    # my $sort=AttrVal($hash->{'NAME'}, "sortby","price"); 
    my $apiKey=$hash->{helper}->{apiKey};
 
-   my ($lat, $lng, $formattedAddress)=@location;
-
+   #my ($lat, $lng, $rad)=@location;
+   #Log3($hash,5,"$hash->{'NAME'}: #### GetStationIDsForLocation: dumper:".Dumper(@location));
+   
    my $result;
 
    if($apiKey eq "") {
@@ -483,7 +520,9 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
        my $r="err no APIKEY";
        return $r;
    }
-   my $url="https://creativecommons.tankerkoenig.de/json/list.php?lat=$lat&lng=$lng&rad=$rad&type=$type&apikey=$apiKey"; 
+
+   Log3($hash,3,"$hash->{'NAME'}: getting stations for https://creativecommons.tankerkoenig.de/json/list.php?lat=$lat&lng=$lng&rad=$rad&type=$type&apikey=$apiKey"); 
+   my $url="https://creativecommons.tankerkoenig.de/json/list.php?lat=".$lat."&lng=".$lng."&rad=".$rad."&type=".$type."&apikey=$apiKey"; 
 
    Log3($hash, 4,"$hash->{NAME}: sending request with url $url");
    
@@ -497,7 +536,7 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
     my ($err, $data) = HttpUtils_BlockingGet($param);
 
     if($err){
-        Log3($hash, 4, "$hash->{NAME}: error fetching nformation");
+        Log3($hash, 4, "$hash->{NAME}: error fetching information");
     } elsif($data){
         Log3($hash, 4, "$hash->{NAME}: got data");
         Log3($hash, 5, "$hash->{NAME}: got data $data\n\n\n");
@@ -510,20 +549,25 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
         } else {
             my @headerHost = grep /Host/, @FW_httpheader;
             $headerHost[0] =~ s/Host: //g;
-
+            
+            if($result->{ok} == 'true'){
+              my $ret="<html><h1>ERROR</h1>$data</html>";
+              return $ret;
+            }
             my ($stations) = $result->{stations};
-            my $ret="<html><p><h3>Stations for Address</h3></p><p><h2>$formattedAddress</h2></p><table><tr><td>Name</td><td>Ort</td><td>Straße</td></tr>";
+            #my $ret="<html><p><h3>Stations for Address</h3></p><p><h2>$formattedAddress</h2></p><table><tr><td>Name</td><td>Ort</td><td>Straße</td></tr>";
+            my $ret="<html><p><h3>Stations for Address</h3></p><p><h2>$lat $lng $rad</h2></p><table><tr><td>Name</td><td>Ort</td><td>Stra&szlig;e</td></tr>";
             foreach (@{$stations}){
                 (my $station)=$_;
-
+#fhem?cmd=set+%3Ca%20href=%27/fhem?detail=BenzinPreise%27%3EBenzinPreise%3C/a%3E+add+id+1b52f84f-03cc-457c-bf76-dcbe5fd3eb33
                 Log3($hash, 2, "Name: $station->{name}, id: $station->{id}");
-                $ret=$ret . "<tr><td><a href=http://" . 
+                $ret=$ret . "<tr><td><a href=\"http://" . 
                             $headerHost[0] . 
                             "/fhem?cmd=set+" . 
                             $hash->{NAME} . 
                             "+add+id+" . 
                             $station->{id} . 
-                            ">";
+                            "\">add</a>";
                 $ret=$ret . $station->{name} . "</td><td>" . $station->{place} . "</td><td>" . $station->{street} . " " . $station->{houseNumber} . "</td></tr>";
             }
             $ret=$ret . "</table>";
@@ -857,6 +901,20 @@ Spritpreis_ParseCoordinatesForAddress(@){
 # helper functions
 #
 #####################################
+sub
+isDefNumber($){
+  my $s=shift;
+  if(undef == $s){
+    return 0;
+  }
+  if(looks_like_number($s)){
+    return 1;
+  }
+  else{
+    return 0;
+  }
+}
+
 1;
 
 =pod
