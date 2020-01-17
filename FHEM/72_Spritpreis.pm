@@ -1,9 +1,10 @@
 ##############################################
-# $Id: 72_Spritpreis.pm 0 2017-01-10 12:00:00Z pjakobs $
-
+# $Id: 72_Spritpreis.pm 0 2020-01-17 11:27:56Z hjgode $
+# DEL ./FHEM/72_Spritpreis.pm
+# UPD 2020-01-17_11:27:56 36031 FHEM/72_Spritpreis.pm
 # v0.0: inital testing
 # v0.1: basic functionality for pre-configured Tankerkoenig IDs
-
+# v0.2: added help file and removed unneeded use(usleep,nanosleep)
 
 package main;
  
