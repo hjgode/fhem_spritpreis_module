@@ -3,7 +3,7 @@
 
 # v0.0: inital testing
 # v0.1: basic functionality for pre-configured Tankerkoenig IDs
-# v0.2: removed unused, unsupported use of usleep and nanosleep hjgode
+
 
 package main;
  
@@ -39,7 +39,7 @@ Spritpreis_Initialize(@) {
     $hash->{AttrFn}         = 'Spritpreis_Attr';
     $hash->{NotifyFn}       = 'Spritpreis_Notify';
     $hash->{ReadFn}         = 'Spritpreis_Read';
-    $hash->{AttrList}       = "lat lon rad IDs type sortby apikey interval address"." $readingFnAttributes";
+    $hash->{AttrList}       = "lat lon rad IDs type sortby apikey interval address priceformat:2dezCut,2dezRound,3dez"." $readingFnAttributes";
     #$hash->{AttrList}       = "IDs type interval"." $readingFnAttributes";
     return undef;
 }
@@ -95,7 +95,7 @@ Spritpreis_Define($$) {
                 if ($@) {
                     Log3 ($hash, 4, "$hash->{NAME}: error decoding response $@");
                 } else {
-                    if ($result->{ok} ne "true"){
+                    if ($result->{ok} ne "true" && $result->{ok} != 1){
                         Log3 ($hash, 2, "$hash->{name}: error: $result->{message}");
                         return undef;
                     }
@@ -612,6 +612,12 @@ Spritpreis_Tankerkoenig_ParseDetailsForID(@){
             foreach my $type (@types){
                 Log3($hash,4,"$hash->{NAME}: checking type $type");
                 if(defined($station->{$type})){
+				
+					if(AttrVal($hash->{NAME}, "priceformat","") eq "2dezCut"){
+						chop($station->{$type});
+					}elsif(AttrVal($hash->{NAME}, "priceformat","") eq "2dezRound"){
+						$station->{$type}=sprintf("%.2f", $station->{$type});
+					}
                     if(ReadingsVal($hash->{NAME}, $i."_".$type."_trend",0)!=0){
                         my $p=ReadingsVal($hash->{NAME}, $i."_".$type."_price",0);
                         Log3($hash,4,"$hash->{NAME}:parseDetailsForID $type price old: $p");
@@ -685,6 +691,12 @@ Spritpreis_Tankerkoenig_ParsePricesForIDs(@){
                     foreach my $type (@types){
                         Log3($hash, 4, "$hash->{NAME} ParsePricesForIDs checking type $type");
                         if(defined($stations->{$id}->{$type})){
+						
+							if(AttrVal($hash->{NAME}, "priceformat","") eq "2dezCut"){
+								chop($stations->{$id}->{$type});
+							}elsif(AttrVal($hash->{NAME}, "priceformat","") eq "2dezRound"){
+								$stations->{$id}->{$type}=sprintf("%.2f", $stations->{$id}->{$type});
+							}
                             Log3($hash, 4, "$hash->{NAME} ParsePricesForIDs updating type $type");
                             #if(ReadingsVal($hash->{NAME}, $i."_".$type."_trend","") ne ""){
                                 my $p=ReadingsVal($hash->{NAME}, $i."_".$type."_price",0);
@@ -854,25 +866,191 @@ Spritpreis_ParseCoordinatesForAddress(@){
 =begin html
 
 <a name="Spritpreis"></a>
-<h3>Spritpreis</h3>
 <div> 
-<ul>
-<li>No help yet</li>
-</ul>
+<h1>FHEM Spritpreis Modul</h1>
+<p>Name: 72_Spritpreis.pm</p>
+<h2>Installation</h2>
+<p>Copy modul file 72<em>Spritpreis.pm to FHEM directory. libjson-perl should be installed for perl. Enter cmd &quot;reload 72</em>Spritpreis.pm&quot; in fhem web or restart fhem.</p>
+<h2>Add new device for Spritprpeis</h2>
+<p>In fhem web cmd enter: &quot;define spritpreis Spritpreis Tankerkoenig 0000-0000-...&quot;, where 0000-0000-... is your api key you got from https://creativecommons.tankerkoenig.de/</p>
+<h2>Add new station</h2>
+<p>To watch the prices for a station, locate the station ID with the help of https://creativecommons.tankerkoenig.de/TankstellenFinder/index.html or the current helper at https://creativecommons.tankerkoenig.de/.
+For example an Aral station in Neuss gives following tankerkoenig station information:</p>
+<pre><code>[
+  {
+    &quot;id&quot;: &quot;127035c1-a7c7-41db-9976-ab4cd14b7271&quot;,
+    &quot;name&quot;: &quot;Aral Tankstelle&quot;,
+    &quot;brand&quot;: &quot;ARAL&quot;,
+    &quot;street&quot;: &quot;Engelbertstraße&quot;,
+    &quot;house_number&quot;: &quot;&quot;,
+    &quot;post_code&quot;: 41462,
+    &quot;place&quot;: &quot;Neuss&quot;,
+    &quot;lat&quot;: 51.2071037,
+    &quot;lng&quot;: 6.671111,
+    &quot;isOpen&quot;: true
+  }
+]  
+</code></pre>
+
+<p>Add the station ID by using the set function inside the detail view of the Spritpreis device you have created:</p>
+<pre><code>set &lt;device_name&gt; add id 127035c1-a7c7-41db-9976-ab4cd14b7271
+</code></pre>
+
+<p>This will add the station and update the readings in the Spritpreis device.</p>
+<p>Alternately you can add the station ID as an attribute using</p>
+<pre><code>attr &lt;device_name&gt; IDs &quot;127035c1-a7c7-41db-9976-ab4cd14b7271&quot;
+</code></pre>
+
+<p>and then use &quot;set <device_name> test&quot; in web cmd view.</p>
+<p>The readings will show prefixed by the order number of the added IDs. For example:</p>
+<pre><code>0_brand
+0_e10_price
+...
+1_brand
+1_e10_price
+...
+</code></pre>
+
+<h2>Reference</h2>
+<p>The source type Spritpreisrechner is not implemented, does only support geolocations. Only Tankerkoenig is implemented.</p>
+<p>define <em>device<em>name</em> Spritpreis <em>price</em>source</em> <em>api_key</em></p>
+<blockquote>
+<p>device_name</p>
+<blockquote>
+<p>name of the newly created fhem device</p>
+</blockquote>
+<p>price_source</p>
+<blockquote>
+<p>either Tankerkoenig or ~~Spritpreisrechner~~</p>
+<p>for Tankerkoenig the &lt;api-key&gt; argument is mandatory, 
+~~for Spritpreisrechner no additional argument needed~~</p>
+</blockquote>
+<p>api-key: the api key you got from Tankerkoenig</p>
+</blockquote>
+<h3>set <device_name></h3>
+<h4>update</h4>
+<blockquote>
+<p>update one or more station readings provided by their station IDs</p>
+<blockquote>
+<p>-none-:</p>
+<blockquote>
+<p>default, if no argument is given, all stations are updated</p>
+</blockquote>
+<p>id &lt;station_id(s)&gt;</p>
+<p>examples</p>
+<blockquote>
+<p>set <device_name> update</p>
+<blockquote>
+<p>updates all defined stations</p>
+</blockquote>
+<p>set <device_name> update id</p>
+<blockquote>
+<p>updates all defined stations</p>
+</blockquote>
+<p>set <device_name> update id 127035c1-a7c7-41db-9976-ab4cd14b7271</p>
+<p>set <device_name> update id 127035c1-a7c7-41db-9976-ab4cd14b7271,12121212-1212-1212-1212-121212121212</p>
+</blockquote>
+</blockquote>
+<p>all</p>
+<blockquote>
+<p>updates the reading for all defined station IDs</p>
+<p>example</p>
+<blockquote>
+<p>set <device_name> update all</p>
+</blockquote>
+</blockquote>
+</blockquote>
+<h4>add</h4>
+<blockquote>
+<p>add id <station_id></p>
+<blockquote>
+<p>adds the station with ID to the list of stations</p>
+</blockquote>
+</blockquote>
+<h4>delete</h4>
+<blockquote>
+<pre><code>not implemented yet
+</code></pre>
+
+</blockquote>
+<h3>get</h3>
+<h4>search</h4>
+<blockquote>
+<p>not implemented yet, Tankerkoenig does not provide a search option and
+Google location search is also not usable without an api-key</p>
+</blockquote>
+<h4>test</h4>
+<blockquote>
+<p>will populate the internal station ID list by the IDs entered as attribut</p>
+</blockquote>
+<h2>attributs</h2>
+<h3>IDs</h3>
+<blockquote>
+<p>list of IDs to be used, will update internal list, when fhem starts or
+when set <device_name> test is used</p>
+</blockquote>
+<h3>interval</h3>
+<blockquote>
+<p>how often the data is requested in minutes interval, please do not
+stress the host! Default is 15 minutes.</p>
+</blockquote>
+<h3>lat</h3>
+<blockquote>
+<p>not used</p>
+</blockquote>
+<h3>lon</h3>
+<blockquote>
+<p>not used</p>
+</blockquote>
+<h3>rad</h3>
+<blockquote>
+<p>not used</p>
+</blockquote>
+<h3>type</h3>
+<blockquote>
+<pre><code>not used: which prices are of interrest
+</code></pre>
+
+<blockquote>
+<pre><code>e5
+e10
+diesel
+all
+</code></pre>
+
+</blockquote>
+</blockquote>
+<h4>sortby</h4>
+<blockquote>
+<p>not used</p>
+</blockquote>
+<h4>apikey</h4>
+<blockquote>
+<p>not used, see define</p>
+</blockquote>
+<h4>address</h4>
+<pre><code>not used    
+</code></pre>
+
+<h4>priceformat</h4>
+<blockquote>
+<p>2dezCut</p>
+<blockquote>
+<p>cut decimals after two digits</p>
+</blockquote>
+<p>2dezRound</p>
+<blockquote>
+<p>round decimal to tow digits</p>
+</blockquote>
+<p>3dez</p>
+<blockquote>
+<p>report three decimal digits</p>
+</blockquote>
+</blockquote>
+
 </div>
 
 =end html
 
-=begin html_DE
-
-<a name="Spritpreis"></a>
-<h3>Spritpreis</h3>
-<div> 
-<ul>
-<li>Noch keine Hilfe</li>
-</ul>
-</div>
-
-=end html_DE
 
 =cut--
