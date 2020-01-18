@@ -3,7 +3,7 @@
 
 # v0.0: inital testing
 # v0.1: basic functionality for pre-configured Tankerkoenig IDs
-
+# attr global featurelevel 5.7 or implement html responses by adding $FW_CSRF
 
 package main;
  
@@ -13,6 +13,7 @@ use warnings;
 use Time::HiRes;
 #use Time::HiRes qw(usleep nanosleep);
 use Time::HiRes qw(time);
+use JSON;
 use JSON::XS;
 use URI::URL;
 use Data::Dumper;
@@ -146,6 +147,7 @@ Spritpreis_Set(@) {
             }elsif($args[0] eq "id"){
                 if(defined $args[1]){
                     Spritpreis_Tankerkoenig_updatePricesForIDs($hash, $args[1]);
+                    return;# will reload page
                 }else{
                     my $r="update id requires an id parameter!";
                     Log3($hash, 2,"$hash->{NAME} $r");
@@ -167,6 +169,7 @@ Spritpreis_Set(@) {
                 #
                 if(defined($args[1])){
                     Spritpreis_Tankerkoenig_GetDetailsForID($hash, $args[1]);
+                    return;
                 }else{
                     my $ret="add by id requires a station id";
                     return $ret;
@@ -181,7 +184,7 @@ Spritpreis_Set(@) {
         # not sure how to "remove" readings through the fhem api
         #
     }
-    return undef;
+    return "undef";
 }
 
 sub
@@ -501,7 +504,7 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
    my ($hash, @loc) = @_;
    #Log3($hash,5,"$hash->{'NAME'}: ++++ GetStationIDsForLocation: dumper:".Dumper(@_));
     my ($lat, $lng, $rad)=@loc;
-    
+    my $devicename=$hash->{NAME};
 #    my $lat=AttrVal($hash->{'NAME'}, "lat",0);
 #    my $lng=AttrVal($hash->{'NAME'}, "lon",0);
 #    my $rad=AttrVal($hash->{'NAME'}, "rad",5);
@@ -550,7 +553,7 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
             my @headerHost = grep /Host/, @FW_httpheader;
             $headerHost[0] =~ s/Host: //g;
             
-            if($result->{ok} == 'true'){
+            if($result->{ok} eq 'true'){
               my $ret="<html><h1>ERROR</h1>$data</html>";
               return $ret;
             }
@@ -560,14 +563,24 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
             foreach (@{$stations}){
                 (my $station)=$_;
 #fhem?cmd=set+%3Ca%20href=%27/fhem?detail=BenzinPreise%27%3EBenzinPreise%3C/a%3E+add+id+1b52f84f-03cc-457c-bf76-dcbe5fd3eb33
+# OK: http://localhost:8083/fhem?cmd=set+BenzinPreise+add+id+8185ea97-8557-491d-a650-0f3be18029fc"
                 Log3($hash, 2, "Name: $station->{name}, id: $station->{id}");
                 $ret=$ret . "<tr><td><a href=\"http://" . 
                             $headerHost[0] . 
                             "/fhem?cmd=set+" . 
-                            $hash->{NAME} . 
+                            #$devicename .
+                            "BenzinPreise". 
                             "+add+id+" . 
                             $station->{id} . 
                             "\">add</a>";
+                Log3 ($hash, 5, "$hash->{NAME}: link="."<tr><td><a href=\"http://" . 
+                            $headerHost[0] . 
+                            "/fhem?cmd=set+" . 
+                            #$devicename ."+"
+                            "BenzinPreise". 
+                            "+add+id+" . 
+                            $station->{id} . 
+                            "\">add</a>");
                 $ret=$ret . $station->{name} . "</td><td>" . $station->{place} . "</td><td>" . $station->{street} . " " . $station->{houseNumber} . "</td></tr>";
             }
             $ret=$ret . "</table>";
@@ -1035,8 +1048,9 @@ For example an Aral station in Neuss gives following tankerkoenig station inform
 <h3>get</h3>
 <h4>search</h4>
 <blockquote>
-<p>not implemented yet, Tankerkoenig does not provide a search option and
-Google location search is also not usable without an api-key</p>
+<p>Google location search is not usable without an api-key<br>
+example: set <i>device_name</i> search <i>lat</i> <i>lon</i> <i>rad</i><br>
+where location is lat/lon and search radius in km provided as <i>rad</i> </p>
 </blockquote>
 <h4>test</h4>
 <blockquote>
