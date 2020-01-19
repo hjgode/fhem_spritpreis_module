@@ -1,0 +1,43 @@
+perldebug fhem
+
+perl -d fhem.pl fhem.cfg
+    starte debug session
+
+CTRL+C
+    break program
+
+c
+    continue
+
+t
+    toggle trace
+
+b main::Spritpreis_Set
+    Breakpoint auf sub setzen
+
+&DB::break_on_filename_line('/tmp/sub.pl',4)
+    break in file at line
+
+b ./72_Spritpreis.pm:139
+b ./72_Spritpreis.pm:565
+    break in file at line
+
+b postpone main::Spritpreis_Set
+    break
+
+s
+    single step
+
+x $hash
+    zeigt inhalt von variable $hash
+
+R
+    Rerun
+
+l main::Spritpreis_Tankerkoenig_GetStationIDsForLocation
+    list source code
+
+####################################
+
+main::Spritpreis_Set(./FHEM/72_Spritpreis.pm:138):
+
