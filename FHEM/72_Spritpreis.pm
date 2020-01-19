@@ -144,6 +144,7 @@ Spritpreis_Set(@) {
                 # removing the timer so we don't get a flurry of requests
                 RemoveInternalTimer($hash);
                 Spritpreis_Tankerkoenig_updateAll($hash);
+                return; #reload page
             }elsif($args[0] eq "id"){
                 if(defined $args[1]){
                     Spritpreis_Tankerkoenig_updatePricesForIDs($hash, $args[1]);
@@ -159,6 +160,7 @@ Spritpreis_Set(@) {
             # default behaviour if no ID or "all" is given is to update all existing IDs
             #
             Spritpreis_Tankerkoenig_updateAll($hash); 
+            return; #reload page
         }
     }elsif($cmd eq "add"){
         if(defined $args[0]){
@@ -171,7 +173,7 @@ Spritpreis_Set(@) {
                     Spritpreis_Tankerkoenig_GetDetailsForID($hash, $args[1]);
                     return;
                 }else{
-                    my $ret="add by id requires a station id";
+                    my $ret="<html><body><h1>ERROR</h1>add by id requires a station id</body></html>";
                     return $ret;
                 }
             }
@@ -183,6 +185,9 @@ Spritpreis_Set(@) {
         # 
         # not sure how to "remove" readings through the fhem api
         #
+        #my $msg="delete is not implemented yet";
+        #return "$hash $name => $msg"; #shows dialog with msg and OK, shows new page 
+        return "<html><body><h1>ERROR</h1>delete is not implemented yet</body></html>";
     }
     return "undef";
 }
@@ -190,6 +195,11 @@ Spritpreis_Set(@) {
 sub
 Spritpreis_Get(@) {
     my ($hash, $name, $cmd, @args) = @_;
+# $msg =~ s/[\r\n]//g;
+# return "$a[0] $a[1] => $msg"; #shows dialog with msg and OK, 
+# return "$hash $name => $msg"; #shows dialog with msg and OK, 
+# see 00_CUL.pm: CUL_Get($@){
+# my ($hash, @a) = @_; #$a[0] is $hash and $a[1] is first arg ($name) ???
     Log3($hash, 5, "*** GET called with ".Dumper(@_));
 
     # possible add number test: if($s =~ /^[0-9,.E]+$/)
@@ -504,7 +514,7 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
    my ($hash, @loc) = @_;
    #Log3($hash,5,"$hash->{'NAME'}: ++++ GetStationIDsForLocation: dumper:".Dumper(@_));
     my ($lat, $lng, $rad)=@loc;
-    my $devicename=$hash->{NAME};
+    my $devicename=$hash->{'NAME'};
 #    my $lat=AttrVal($hash->{'NAME'}, "lat",0);
 #    my $lng=AttrVal($hash->{'NAME'}, "lon",0);
 #    my $rad=AttrVal($hash->{'NAME'}, "rad",5);
@@ -537,7 +547,21 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
        header   => "User-Agent: fhem\r\nAccept: application/json",
     };
     my ($err, $data) = HttpUtils_BlockingGet($param);
-
+#/TODO use HttpUtils_NonblockingGet($)
+# Parameters in the hash:
+#  mandatory:
+#    url, callback
+#  optional(default):
+#    digest(0),hideurl(0),timeout(4),data(""),loglevel(4),header("" or HASH),
+#    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
+#    method($data?"POST":"GET"),keepalive(0),sslargs({}),user(),pwd()
+#    compress(1), incrementalTimeout(0)
+# Example:
+#   { HttpUtils_NonblockingGet({ url=>"http://fhem.de/MAINTAINER.txt",
+#     callback=>sub($$$){ Log 1,"ERR:$_[1] DATA:".length($_[2]) } }) }
+#
+# callback is called with three args: {callback}($hash, $fErr, $fContent)
+# see 59_Twilight.pm and others for usage
     if($err){
         Log3($hash, 4, "$hash->{NAME}: error fetching information");
     } elsif($data){
@@ -564,15 +588,18 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
                 (my $station)=$_;
 #fhem?cmd=set+%3Ca%20href=%27/fhem?detail=BenzinPreise%27%3EBenzinPreise%3C/a%3E+add+id+1b52f84f-03cc-457c-bf76-dcbe5fd3eb33
 # OK: http://localhost:8083/fhem?cmd=set+BenzinPreise+add+id+8185ea97-8557-491d-a650-0f3be18029fc"
+
+#$DB::single = 1; #break in debugger
+
                 Log3($hash, 2, "Name: $station->{name}, id: $station->{id}");
                 $ret=$ret . "<tr><td><a href=\"http://" . 
                             $headerHost[0] . 
                             "/fhem?cmd=set+" . 
-                            #$devicename .
-                            "BenzinPreise". 
+                            $devicename .
+                            #"BenzinPreise". 
                             "+add+id+" . 
                             $station->{id} . 
-                            "\">add</a>";
+                            "\">add </a>";
                 Log3 ($hash, 5, "$hash->{NAME}: link="."<tr><td><a href=\"http://" . 
                             $headerHost[0] . 
                             "/fhem?cmd=set+" . 
