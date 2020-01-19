@@ -868,6 +868,9 @@ Spritpreis_GetCoordinatesForAddress(@){
     
     my $result;
 
+#alternatively use goecode.farm, no API key, 250 requests allowed per day per IP
+# https://www.geocode.farm/v3/json/forward/?addr=41363+DE&country=de&lang=en&count=1
+
     my $url=new URI::URL 'https://maps.google.com/maps/api/geocode/json';
     $url->query_form("address",$address);
     Log3($hash, 3, "$hash->{NAME}: request URL: ".$url);
