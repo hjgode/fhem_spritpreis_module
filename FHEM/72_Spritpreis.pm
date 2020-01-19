@@ -313,7 +313,7 @@ Spritpreis_updateAll(@){
 # functions to create requests
 #
 #####################################
-
+#@NOT_USED
 sub
 Spritpreis_Tankerkoenig_GetIDsForLocation(@){
     my ($hash) = @_;
@@ -503,10 +503,11 @@ Spritpreis_Spritpreisrechner_updatePricesForLocation(@){
     return undef;
 }
 
+#used by get for Tankerkoenig
 sub
 Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
    #
-   # This is currently not being used. The idea is to provide a lat/long location and a radius and have
+   # The idea is to provide a lat/long location and a radius and have
    # the stations within this radius are presented as a list and, upon selecting them, will be added
    # to the readings list
    # example get search 52.033 8.750 5
@@ -654,6 +655,7 @@ Spritpreis_callback(@) {
   return undef;
  }
 
+#used only by NOT_USED
 sub 
 Spritpreis_ParseIDsForLocation(@){
     return undef;
@@ -809,6 +811,7 @@ Spritpreis_Tankerkoenig_ParsePricesForIDs(@){
     return undef;
 }
 
+#@NOT_USED
 sub
 Spritpreis_Tankerkoening_ParseStationIDsForLocation(@){
     my ($hash, $err, $data)=@_;
@@ -849,6 +852,7 @@ Spritpreis_Tankerkoening_ParseStationIDsForLocation(@){
     return $data; 
 }
 
+#@NOT_USED
 sub
 Spritpreis_ParsePricesForIDs(@){
 }
@@ -857,7 +861,7 @@ Spritpreis_ParsePricesForIDs(@){
 # geolocation functions
 #
 #####################################
-
+#@used by by get for Spritpreise.at
 sub
 Spritpreis_GetCoordinatesForAddress(@){
     my ($hash, $address)=@_;
@@ -905,6 +909,7 @@ Spritpreis_GetCoordinatesForAddress(@){
     return undef; 
 }
 
+#@NOT_USED
 sub
 Spritpreis_ParseCoordinatesForAddress(@){
     my ($hash, $err, $data)=@_;
