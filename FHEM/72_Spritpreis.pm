@@ -18,6 +18,7 @@ use JSON::XS;
 use URI::URL;
 use Data::Dumper;
 require "HttpUtils.pm";
+use Encode qw(decode encode);
 
 use Scalar::Util 'looks_like_number';
 
@@ -209,16 +210,17 @@ Spritpreis_Get(@) {
 
 
     if ($cmd eq "search"){
-        my $lat;
-        my $lon;
-        my $rad;
+        my $lat=0;
+        my $lon=0;
+        my $rad=0;
     
         #now fill with args
         ($lat, $lon, $rad)=@args;
-        
-#        $lat=AttrVal($hash->{'NAME'}, "lat",0) if(isDefNumber($lat));
-#        $lon=AttrVal($hash->{'NAME'}, "lon",0) if(isDefNumber($lon));
-#        $rad=AttrVal($hash->{'NAME'}, "rad",0) if(isDefNumber($rad));
+
+        #fill missing values from attr        
+        $lat=AttrVal($hash->{'NAME'}, "lat",0) if(isDefNumber($lat));
+        $lon=AttrVal($hash->{'NAME'}, "lon",0) if(isDefNumber($lon));
+        $rad=AttrVal($hash->{'NAME'}, "rad",0) if(isDefNumber($rad));
     
 #        if( ! isDefNumber($lat) || ! ! isDefNumber($lon) || ! isDefNumber($rad) ){
 #          return "please use search with lat, lon and rad value. For example: 52.033 8.750 5";
@@ -240,6 +242,7 @@ Spritpreis_Get(@) {
           return $ret;
         }
         else{
+          Log3($hash,4,"$hash->{NAME}: Calling GetCoordinatesForAddress with $hash, $str");
           @loc=Spritpreis_GetCoordinatesForAddress($hash, $str);
           my ($lat, $lon, $str)=@loc;
         }
@@ -523,6 +526,9 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
    my $type=AttrVal($hash->{'NAME'}, "type","all");
    # my $sort=AttrVal($hash->{'NAME'}, "sortby","price"); 
    my $apiKey=$hash->{helper}->{apiKey};
+   if($apiKey eq ""){
+      $apiKey = AttrVal($hash->{'NAME'}, "apikey", "");
+   }
 
    #my ($lat, $lng, $rad)=@location;
    #Log3($hash,5,"$hash->{'NAME'}: #### GetStationIDsForLocation: dumper:".Dumper(@location));
@@ -546,34 +552,28 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
        timeout  => 1,
        method   => "GET",
        header   => "User-Agent: fhem\r\nAccept: application/json",
+#       callback => \&GetStationIDsForLocation_callback,
+#       lat      => $lat,
+#       lng      => $lng,
+#       rad      => $rad,
+#       devicename => $devicename,
     };
+#    HttpUtils_NonblockingGet($param);
+    
     my ($err, $data) = HttpUtils_BlockingGet($param);
-#/TODO use HttpUtils_NonblockingGet($)
-# Parameters in the hash:
-#  mandatory:
-#    url, callback
-#  optional(default):
-#    digest(0),hideurl(0),timeout(4),data(""),loglevel(4),header("" or HASH),
-#    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
-#    method($data?"POST":"GET"),keepalive(0),sslargs({}),user(),pwd()
-#    compress(1), incrementalTimeout(0)
-# Example:
-#   { HttpUtils_NonblockingGet({ url=>"http://fhem.de/MAINTAINER.txt",
-#     callback=>sub($$$){ Log 1,"ERR:$_[1] DATA:".length($_[2]) } }) }
-#
-# callback is called with three args: {callback}($hash, $fErr, $fContent)
-# see 59_Twilight.pm and others for usage
     if($err){
         Log3($hash, 4, "$hash->{NAME}: error fetching information");
+        return $err;
     } elsif($data){
         Log3($hash, 4, "$hash->{NAME}: got data");
-        Log3($hash, 5, "$hash->{NAME}: got data $data\n\n\n");
 
         eval {
+            # convert from utf-8 encoding to unicode
             $result = JSON->new->utf8(1)->decode($data);
         };
         if ($@) {
             Log3 ($hash, 4, "$hash->{NAME}: error decoding response $@");
+            return "error decoding response $@"; 
         } else {
             my @headerHost = grep /Host/, @FW_httpheader;
             $headerHost[0] =~ s/Host: //g;
@@ -584,7 +584,7 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
             }
             my ($stations) = $result->{stations};
             #my $ret="<html><p><h3>Stations for Address</h3></p><p><h2>$formattedAddress</h2></p><table><tr><td>Name</td><td>Ort</td><td>Straße</td></tr>";
-            my $ret="<html><p><h3>Stations for Address</h3></p><p><h2>$lat $lng $rad</h2></p><table><tr><td>Name</td><td>Ort</td><td>Stra&szlig;e</td></tr>";
+            my $ret="<html><header><meta charset='UTF-8'></header><body><p><h3>Stations for Address</h3></p><p><h2>$lat $lng $rad</h2></p><table><tr><td>Name</td><td>Ort</td><td>Stra&szlig;e</td></tr>";
             foreach (@{$stations}){
                 (my $station)=$_;
 #fhem?cmd=set+%3Ca%20href=%27/fhem?detail=BenzinPreise%27%3EBenzinPreise%3C/a%3E+add+id+1b52f84f-03cc-457c-bf76-dcbe5fd3eb33
@@ -600,7 +600,7 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
                             #"BenzinPreise". 
                             "+add+id+" . 
                             $station->{id} . 
-                            "\">add </a>";
+                            "\"  target=\"_blank\" >add $station->{id}</a>";
                 Log3 ($hash, 5, "$hash->{NAME}: link="."<tr><td><a href=\"http://" . 
                             $headerHost[0] . 
                             "/fhem?cmd=set+" . 
@@ -611,9 +611,10 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
                             "\">add</a>");
                 $ret=$ret . $station->{name} . "</td><td>" . $station->{place} . "</td><td>" . $station->{street} . " " . $station->{houseNumber} . "</td></tr>";
             }
-            $ret=$ret . "</table>";
-            Log3($hash,2,"$hash->{NAME}: ############# ret: $ret");
-            return $ret;
+            $ret=$ret . "</table></body></html>";
+            my $utf8 = encode("utf-8", $ret);
+            Log3($hash,2,"$hash->{NAME}: ############# ret: $utf8");
+            return $utf8;
         }         
     }else {
         Log3 ($hash, 4, "$hash->{NAME}: something's very odd");
@@ -628,6 +629,87 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
 # functions to handle responses
 #
 #####################################
+
+#NOT_USED gives SSL wants a read first
+sub
+GetStationIDsForLocation_callback(@){
+    my ($param, $err, $data) = @_;
+    my ($hash) = $param->{hash};
+    my $result;
+    my $lat=$param->{lat};
+    my $lng=$param->{lng};
+    my $rad=$param->{rad};
+    my $devicename=$param->{devicename};
+    
+    Log3($hash, 4, "$hash->{NAME}: GetStationIDsForLocation_callback...");
+    
+    if($err){
+        Log3($hash, 4, "$hash->{NAME}: error fetching information");
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"last_error", $err);
+        readingsEndUpdate($hash,1);
+        return;
+    } elsif($data){
+        Log3($hash, 4, "$hash->{NAME}: got data");
+        Log3($hash, 5, "$hash->{NAME}: got data $data\n\n\n");
+
+        eval {
+            # convert from utf-8 encoding to unicode
+            $result = JSON->new->utf8(1)->decode($data);
+
+        };
+        if ($@) {
+            Log3 ($hash, 4, "$hash->{NAME}: error decoding response $@");
+        } else {
+            my @headerHost = grep /Host/, @FW_httpheader;
+            $headerHost[0] =~ s/Host: //g;
+            
+            if($result->{ok} eq 'true'){
+              my $ret="<html><h1>ERROR</h1>$data</html>";
+              return $ret;
+            }
+            my ($stations) = $result->{stations};
+            #my $ret="<html><p><h3>Stations for Address</h3></p><p><h2>$formattedAddress</h2></p><table><tr><td>Name</td><td>Ort</td><td>Straße</td></tr>";
+            my $ret="<html><header><meta charset='UTF-8'></header><body><p><h3>Stations for Address</h3></p><p><h2>$lat $lng $rad</h2></p><table><tr><td>Name</td><td>Ort</td><td>Stra&szlig;e</td></tr>";
+            foreach (@{$stations}){
+                (my $station)=$_;
+#fhem?cmd=set+%3Ca%20href=%27/fhem?detail=BenzinPreise%27%3EBenzinPreise%3C/a%3E+add+id+1b52f84f-03cc-457c-bf76-dcbe5fd3eb33
+# OK: http://localhost:8083/fhem?cmd=set+BenzinPreise+add+id+8185ea97-8557-491d-a650-0f3be18029fc"
+
+#$DB::single = 1; #break in debugger
+
+                Log3($hash, 2, "Name: $station->{name}, id: $station->{id}");
+                $ret=$ret . "<tr><td><a href=\"http://" . 
+                            $headerHost[0] . 
+                            "/fhem?cmd=set+" . 
+                            $devicename .
+                            #"BenzinPreise". 
+                            "+add+id+" . 
+                            $station->{id} . 
+                            "\"  target=\"_blank\" >add $station->{id}</a>";
+                Log3 ($hash, 5, "$hash->{NAME}: link="."<tr><td><a href=\"http://" . 
+                            $headerHost[0] . 
+                            "/fhem?cmd=set+" . 
+                            #$devicename ."+"
+                            "BenzinPreise". 
+                            "+add+id+" . 
+                            $station->{id} . 
+                            "\">add</a>");
+                $ret=$ret . $station->{name} . "</td><td>" . $station->{place} . "</td><td>" . $station->{street} . " " . $station->{houseNumber} . "</td></tr>";
+            }
+            $ret=$ret . "</table></body></html>";
+            my $utf8 = encode("utf-8", $ret);
+            Log3($hash,2,"$hash->{NAME}: ############# ret: $utf8");
+            #return $utf8; #this will not show a new dialog as we are in a callback
+            readingsBeginUpdate($hash);
+            readingsBulkUpdate($hash,"last_response", $ret);
+            readingsEndUpdate($hash,1);
+        }         
+    }else {
+        Log3 ($hash, 4, "$hash->{NAME}: something's very odd");
+    }
+    return; 
+}
 
 sub
 Spritpreis_callback(@) {
@@ -694,7 +776,7 @@ Spritpreis_Tankerkoenig_ParseDetailsForID(@){
             }
             readingsBeginUpdate($hash);
 
-            readingsBulkUpdate($hash,$i."_name",$station->{name});
+            readingsBulkUpdate($hash,$i."_name",encode("utf-8", $station->{name})); #decode utf-8 (html, JSON) back from unicode (perl)
             my @types=("e5", "e10", "diesel");
             foreach my $type (@types){
                 Log3($hash,4,"$hash->{NAME}: checking type $type");
@@ -705,7 +787,8 @@ Spritpreis_Tankerkoenig_ParseDetailsForID(@){
 					}elsif(AttrVal($hash->{NAME}, "priceformat","") eq "2dezRound"){
 						$station->{$type}=sprintf("%.2f", $station->{$type});
 					}
-                    if(ReadingsVal($hash->{NAME}, $i."_".$type."_trend",0)!=0){
+                    if(ReadingsVal($hash->{NAME}, $i."_".$type."_trend","") ne ""){
+                        #read old price
                         my $p=ReadingsVal($hash->{NAME}, $i."_".$type."_price",0);
                         Log3($hash,4,"$hash->{NAME}:parseDetailsForID $type price old: $p");
                         if($p>$station->{$type}){
@@ -720,14 +803,14 @@ Spritpreis_Tankerkoenig_ParseDetailsForID(@){
                     }
                 }
             }
-            readingsBulkUpdate($hash,$i."_place",$station->{place});
-            readingsBulkUpdate($hash,$i."_street",$station->{street}." ".$station->{houseNumber});
-            readingsBulkUpdate($hash,$i."_distance",$station->{dist});
-            readingsBulkUpdate($hash,$i."_brand",$station->{brand});
-            readingsBulkUpdate($hash,$i."_lat",$station->{lat});
-            readingsBulkUpdate($hash,$i."_lon",$station->{lng});
-            readingsBulkUpdate($hash,$i."_id",$station->{id});
-            readingsBulkUpdate($hash,$i."_isOpen",$station->{isOpen});
+            readingsBulkUpdate($hash,$i."_place",encode("utf-8", $station->{place}));
+            readingsBulkUpdate($hash,$i."_street",encode("utf-8", $station->{street})." ".encode("utf-8", $station->{houseNumber}));
+            readingsBulkUpdate($hash,$i."_distance",encode("utf-8", $station->{dist}));
+            readingsBulkUpdate($hash,$i."_brand",encode("utf-8", $station->{brand}));
+            readingsBulkUpdate($hash,$i."_lat",encode("utf-8", $station->{lat}));
+            readingsBulkUpdate($hash,$i."_lon",encode("utf-8", $station->{lng}));
+            readingsBulkUpdate($hash,$i."_id",encode("utf-8", $station->{id}));
+            readingsBulkUpdate($hash,$i."_isOpen",encode("utf-8", $station->{isOpen}));
           
             readingsEndUpdate($hash,1);
         } 
