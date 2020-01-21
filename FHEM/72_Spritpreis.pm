@@ -19,6 +19,7 @@ use URI::URL;
 use Data::Dumper;
 require "HttpUtils.pm";
 use Encode qw(decode encode);
+use vars qw(@FW_fhemwebjs);
 
 use Scalar::Util 'looks_like_number';
 
@@ -30,6 +31,8 @@ $Data::Dumper::Sortkeys = 1;
 # fhem skeleton functions
 #
 #####################################
+
+my @g_StationList=();
 
 sub
 Spritpreis_Initialize(@) {
@@ -45,6 +48,7 @@ Spritpreis_Initialize(@) {
     $hash->{ReadFn}         = 'Spritpreis_Read';
     $hash->{AttrList}       = "lat lon rad IDs type sortby apikey interval address priceformat:2dezCut,2dezRound,3dez"." $readingFnAttributes";
     #$hash->{AttrList}       = "IDs type interval"." $readingFnAttributes";
+    $hash->{FW_detailFn} = "Spritpreis_Detail";
     return undef;
 }
 
@@ -234,6 +238,12 @@ Spritpreis_Get(@) {
             $i++;
         }
         Log3($hash,4,"$hash->{NAME}: search string: $str");
+
+    ### TEST
+    #$html.="<a style=\"cursor: pointer;\" onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmd',function(data){FW_okDialog(data)})\">$img</a>";
+#    FW_AsyncOutput($hash, '<html>Hello world!</html>',10000); #Please define devicename first ;-(
+#    FW_cmd(FW_root+'?cmd={FW_makeImage("fts_shutter_10")}&XHR=1', function(data){FW_okDialog(data)});
+#$hash->{FW_detailFn} = "my_Routine";
         
         if($lat!=0 && $lon!=0 && $rad!=0){
           Log3($hash,4,"$hash->{NAME}: Calling GetStationIDsForLocation with $lat, $lon, $rad");
@@ -265,6 +275,7 @@ Spritpreis_Get(@) {
     #Spritpreis_Tankerkoenig_GetPricesForLocation($hash);
     #Spritpreis_GetCoordinatesForAddress($hash,"Hamburg, Elbphilharmonie");
     # add price trigger here
+
     return undef;
 }
 
@@ -289,6 +300,29 @@ Spritpreis_Read(@) {
     return undef;
 }
 
+sub
+Spritpreis_Detail(@){
+#$FW_wname, $deviceName, $FW_room
+	my ($name, $d, $room, $pageHash) = @_;
+	my $hash = $defs{$name};
+  
+	my $ret = ""; 
+	$ret .= "<table class=\"block wide\" id=\"dashboardtoolbar\"  style=\"width:100%\">\n";
+	$ret .= "<tr><td>Helper:\n<div>\n";  
+    @g_StationList = (); #global list empty
+    foreach (@g_StationList){
+        my $id=$_[0];
+        my $name=$_[1];
+        Log3 ($hash,4,"\$id=$id, \$name=$name");
+    }
+	$ret .= "	   <a href=\"$FW_ME/dashboard/" . $d . "\"><button type=\"button\">Return to Dashboard</button></a>\n";
+	$ret .= "	   <a href=\"$FW_ME?cmd=shutdown restart\"><button type=\"button\">Restart FHEM</button></a>\n";
+	$ret .= "	   <a href=\"$FW_ME?cmd=save\"><button type=\"button\">Save config</button></a>\n";
+	$ret .= "  </div>\n";
+	$ret .= "</td></tr>\n"; 	
+	$ret .= "</table>\n";
+	return $ret;
+}
 #####################################
 #
 # generalized functions
@@ -585,6 +619,7 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
             my ($stations) = $result->{stations};
             #my $ret="<html><p><h3>Stations for Address</h3></p><p><h2>$formattedAddress</h2></p><table><tr><td>Name</td><td>Ort</td><td>Straße</td></tr>";
             my $ret="<html><header><meta charset='UTF-8'></header><body><p><h3>Stations for Address</h3></p><p><h2>$lat $lng $rad</h2></p><table><tr><td>Name</td><td>Ort</td><td>Stra&szlig;e</td></tr>";
+            @g_StationList = (); #global list empty
             foreach (@{$stations}){
                 (my $station)=$_;
 #fhem?cmd=set+%3Ca%20href=%27/fhem?detail=BenzinPreise%27%3EBenzinPreise%3C/a%3E+add+id+1b52f84f-03cc-457c-bf76-dcbe5fd3eb33
@@ -610,6 +645,8 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
                             $station->{id} . 
                             "\">add</a>");
                 $ret=$ret . $station->{name} . "</td><td>" . $station->{place} . "</td><td>" . $station->{street} . " " . $station->{houseNumber} . "</td></tr>";
+
+                push @g_StationList, ($station->{id}, $station->{name}, $station->{place});
             }
             $ret=$ret . "</table></body></html>";
             my $utf8 = encode("utf-8", $ret);
@@ -1036,13 +1073,13 @@ sub
 isDefNumber($){
   my $s=shift;
   if(undef == $s){
-    return 0;
+    return -1;
   }
   if(looks_like_number($s)){
-    return 1;
+    return 0;
   }
   else{
-    return 0;
+    return -1;
   }
 }
 
