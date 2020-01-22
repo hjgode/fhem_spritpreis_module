@@ -32,7 +32,7 @@ $Data::Dumper::Sortkeys = 1;
 #
 #####################################
 
-my @g_StationList=();
+our $g_StationList={};
 
 sub
 Spritpreis_Initialize(@) {
@@ -46,7 +46,7 @@ Spritpreis_Initialize(@) {
     $hash->{AttrFn}         = 'Spritpreis_Attr';
     $hash->{NotifyFn}       = 'Spritpreis_Notify';
     $hash->{ReadFn}         = 'Spritpreis_Read';
-    $hash->{AttrList}       = "lat lon rad IDs type sortby apikey interval address priceformat:2dezCut,2dezRound,3dez"." $readingFnAttributes";
+    $hash->{AttrList}       = "readingList setList lat lon rad IDs type sortby apikey interval address priceformat:2dezCut,2dezRound,3dez"." $readingFnAttributes";
     #$hash->{AttrList}       = "IDs type interval"." $readingFnAttributes";
     $hash->{FW_detailFn} = "Spritpreis_Detail";
     return undef;
@@ -309,15 +309,17 @@ Spritpreis_Detail(@){
 	my $ret = ""; 
 	$ret .= "<table class=\"block wide\" id=\"dashboardtoolbar\"  style=\"width:100%\">\n";
 	$ret .= "<tr><td>Helper:\n<div>\n";  
-    @g_StationList = (); #global list empty
-    foreach (@g_StationList){
-        my $id=$_[0];
-        my $name=$_[1];
+    Log3 ($hash, 5, "g_StationList: ".Dumper($main::g_StationList));
+$DB::single = 1; #break in debugger
+    foreach my $station ($main::g_StationList){
+        my $id=$station->{'id'};
+        my $name=$station->{'name'};
         Log3 ($hash,4,"\$id=$id, \$name=$name");
+        $ret .= "	   <a href=\"$FW_ME?cmd=set+".$d."+add+id+".$id."\"><button type=\"button\">add ".$name."</button></a>\n";
     }
-	$ret .= "	   <a href=\"$FW_ME/dashboard/" . $d . "\"><button type=\"button\">Return to Dashboard</button></a>\n";
-	$ret .= "	   <a href=\"$FW_ME?cmd=shutdown restart\"><button type=\"button\">Restart FHEM</button></a>\n";
-	$ret .= "	   <a href=\"$FW_ME?cmd=save\"><button type=\"button\">Save config</button></a>\n";
+#	$ret .= "	   <a href=\"$FW_ME/dashboard/" . $d . "\"><button type=\"button\">Return to Dashboard</button></a>\n";
+#	$ret .= "	   <a href=\"$FW_ME?cmd=shutdown restart\"><button type=\"button\">Restart FHEM</button></a>\n";
+#	$ret .= "	   <a href=\"$FW_ME?cmd=save\"><button type=\"button\">Save config</button></a>\n";
 	$ret .= "  </div>\n";
 	$ret .= "</td></tr>\n"; 	
 	$ret .= "</table>\n";
@@ -619,7 +621,7 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
             my ($stations) = $result->{stations};
             #my $ret="<html><p><h3>Stations for Address</h3></p><p><h2>$formattedAddress</h2></p><table><tr><td>Name</td><td>Ort</td><td>Straße</td></tr>";
             my $ret="<html><header><meta charset='UTF-8'></header><body><p><h3>Stations for Address</h3></p><p><h2>$lat $lng $rad</h2></p><table><tr><td>Name</td><td>Ort</td><td>Stra&szlig;e</td></tr>";
-            @g_StationList = (); #global list empty
+            %{$main::g_StationList} = (); #global list empty
             foreach (@{$stations}){
                 (my $station)=$_;
 #fhem?cmd=set+%3Ca%20href=%27/fhem?detail=BenzinPreise%27%3EBenzinPreise%3C/a%3E+add+id+1b52f84f-03cc-457c-bf76-dcbe5fd3eb33
@@ -646,7 +648,9 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
                             "\">add</a>");
                 $ret=$ret . $station->{name} . "</td><td>" . $station->{place} . "</td><td>" . $station->{street} . " " . $station->{houseNumber} . "</td></tr>";
 
-                push @g_StationList, ($station->{id}, $station->{name}, $station->{place});
+                $main::g_StationList{'id'} = $station->{id};
+                $main::g_StationList{'name'} = $station->{name};
+                $main::g_StationList{'place'}= $station->{place};
             }
             $ret=$ret . "</table></body></html>";
             my $utf8 = encode("utf-8", $ret);
