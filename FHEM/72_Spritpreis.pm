@@ -210,17 +210,17 @@ Spritpreis_Get(@) {
 
 
     if ($cmd eq "search"){
-        my $lat=0;
-        my $lon=0;
-        my $rad=0;
+        my $lat="";
+        my $lon="";
+        my $rad="";
     
         #now fill with args
         ($lat, $lon, $rad)=@args;
 
         #fill missing values from attr        
-        $lat=AttrVal($hash->{'NAME'}, "lat",0) if(isDefNumber($lat));
-        $lon=AttrVal($hash->{'NAME'}, "lon",0) if(isDefNumber($lon));
-        $rad=AttrVal($hash->{'NAME'}, "rad",0) if(isDefNumber($rad));
+        $lat=AttrVal($hash->{'NAME'}, "lat",'') if(isDefNumber($lat));
+        $lon=AttrVal($hash->{'NAME'}, "lon",'') if(isDefNumber($lon));
+        $rad=AttrVal($hash->{'NAME'}, "rad",'') if(isDefNumber($rad));
     
 #        if( ! isDefNumber($lat) || ! ! isDefNumber($lon) || ! isDefNumber($rad) ){
 #          return "please use search with lat, lon and rad value. For example: 52.033 8.750 5";
@@ -233,28 +233,27 @@ Spritpreis_Get(@) {
             $str=$str." ".$args[$i];
             $i++;
         }
-        Log3($hash,4,"$hash->{NAME}: search string: $str");
+        Log3($hash,4,"$hash->{NAME}: search string: '$str'");
         
-        if($lat!=0 && $lon!=0 && $rad!=0){
+        if($lat ne '' && $lon ne '' && $rad ne ''){
           Log3($hash,4,"$hash->{NAME}: Calling GetStationIDsForLocation with $lat, $lon, $rad");
           @loc=($lat, $lon, $rad);#=@loc; #store vals in array
           $ret=Spritpreis_Tankerkoenig_GetStationIDsForLocation($hash, @loc);
           return $ret;
-        }
-        else{
+        }elsif ($str ne ''){
           Log3($hash,4,"$hash->{NAME}: Calling GetCoordinatesForAddress with $hash, $str");
           @loc=Spritpreis_GetCoordinatesForAddress($hash, $str);
           my ($lat, $lon, $str)=@loc;
         }
-        
-        if($lat==0 && $lon==0){
-            return $str;
-        }else{
-            if($hash->{helper}->{service} eq "Tankerkoenig"){
-                $ret=Spritpreis_Tankerkoenig_GetStationIDsForLocation($hash, @loc);
-                return $ret;
-            }
-        }
+#		else{
+#            if($hash->{helper}->{service} eq "Tankerkoenig"){
+#                $ret=Spritpreis_Tankerkoenig_GetStationIDsForLocation($hash, @loc);
+#                return $ret;
+#            }
+#        }
+		else{
+			return "unable to search for '$str'";
+		}
     }elsif($cmd eq "test"){
             $ret=Spritpreis_Tankerkoenig_populateStationsFromAttr($hash);
             return $ret;
@@ -585,6 +584,7 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
             my ($stations) = $result->{stations};
             #my $ret="<html><p><h3>Stations for Address</h3></p><p><h2>$formattedAddress</h2></p><table><tr><td>Name</td><td>Ort</td><td>Straße</td></tr>";
             my $ret="<html><header><meta charset='UTF-8'></header><body><p><h3>Stations for Address</h3></p><p><h2>$lat $lng $rad</h2></p><table><tr><td>Name</td><td>Ort</td><td>Stra&szlig;e</td></tr>";
+			my $stationlist=""; # store stations with id, brand, name, place
             foreach (@{$stations}){
                 (my $station)=$_;
 #fhem?cmd=set+%3Ca%20href=%27/fhem?detail=BenzinPreise%27%3EBenzinPreise%3C/a%3E+add+id+1b52f84f-03cc-457c-bf76-dcbe5fd3eb33
@@ -610,10 +610,17 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
                             $station->{id} . 
                             "\">add</a>");
                 $ret=$ret . $station->{name} . "</td><td>" . $station->{place} . "</td><td>" . $station->{street} . " " . $station->{houseNumber} . "</td></tr>";
+				$stationlist.=$station->{id}." ";
+				$stationlist.=$station->{brand}."\n";
+				$stationlist.=$station->{place}." ".$station->{street}." ".$station->{houseNumber}."\n";
             }
             $ret=$ret . "</table></body></html>";
             my $utf8 = encode("utf-8", $ret);
             Log3($hash,2,"$hash->{NAME}: ############# ret: $utf8");
+			#update reading stations_found
+			readingsBeginUpdate($hash);
+			readingsBulkUpdate($hash,"stations_found", encode("utf-8", $stationlist));
+			readingsEndUpdate($hash,1);
             return $utf8;
         }         
     }else {
