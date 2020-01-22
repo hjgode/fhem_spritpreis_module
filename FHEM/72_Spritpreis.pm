@@ -216,11 +216,12 @@ Spritpreis_Get(@) {
     
         #now fill with args
         ($lat, $lon, $rad)=@args;
+#$DB::single = 1; #break in debugger
 
         #fill missing values from attr        
-        $lat=AttrVal($hash->{'NAME'}, "lat",'') if(isDefNumber($lat));
-        $lon=AttrVal($hash->{'NAME'}, "lon",'') if(isDefNumber($lon));
-        $rad=AttrVal($hash->{'NAME'}, "rad",'') if(isDefNumber($rad));
+#        $lat=AttrVal($hash->{'NAME'}, "lat",'') if(isDefNumber($lat));
+#        $lon=AttrVal($hash->{'NAME'}, "lon",'') if(isDefNumber($lon));
+#        $rad=AttrVal($hash->{'NAME'}, "rad",'') if(isDefNumber($rad));
     
 #        if( ! isDefNumber($lat) || ! ! isDefNumber($lon) || ! isDefNumber($rad) ){
 #          return "please use search with lat, lon and rad value. For example: 52.033 8.750 5";
@@ -235,7 +236,7 @@ Spritpreis_Get(@) {
         }
         Log3($hash,4,"$hash->{NAME}: search string: '$str'");
         
-        if($lat ne '' && $lon ne '' && $rad ne ''){
+        if($lat ne 'DE' && $lat ne 'AT' && $lat ne '' && $lon ne '' && $rad ne ''){
           Log3($hash,4,"$hash->{NAME}: Calling GetStationIDsForLocation with $lat, $lon, $rad");
           @loc=($lat, $lon, $rad);#=@loc; #store vals in array
           $ret=Spritpreis_Tankerkoenig_GetStationIDsForLocation($hash, @loc);
@@ -327,7 +328,7 @@ Spritpreis_Tankerkoenig_GetIDsForLocation(@){
     Log3($hash,4,"$hash->{'NAME'}: apiKey: $apiKey");
 
     if($apiKey eq "") {
-        Log3($hash,3,"$hash->{'NAME'}: please provide a valid apikey, you can get it from https://creativecommons.tankerkoenig.de/#register. This function can't work without it"); 
+        Log3($hash,3,"$hash->{'NAME'}:GetIDsForLocation please provide a valid apikey, you can get it from https://creativecommons.tankerkoenig.de/#register. This function can't work without it"); 
         my $r="err no APIKEY";
         return $r; 
     }
@@ -431,7 +432,7 @@ Spritpreis_Tankerkoenig_GetDetailsForID(@){
     my ($hash, $id)=@_;
     my $apiKey=$hash->{helper}->{apiKey};
     if($apiKey eq "") {
-        Log3($hash,3,"$hash->{'NAME'}: please provide a valid apikey, you can get it from https://creativecommons.tankerkoenig.de/#register. This function can't work without it"); 
+        Log3($hash,3,"$hash->{'NAME'}:GetDetailsForID please provide a valid apikey, you can get it from https://creativecommons.tankerkoenig.de/#register. This function can't work without it"); 
         my $r="err no APIKEY";
         return $r;
     }
@@ -535,7 +536,7 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
    my $result;
 
    if($apiKey eq "") {
-       Log3($hash,3,"$hash->{'NAME'}: please provide a valid apikey, you can get it from https://creativecommons.tankerkoenig.de/#register. This function can't work without it"); 
+       Log3($hash,3,"$hash->{'NAME'}:GetStationIDsForLocation please provide a valid apikey, you can get it from https://creativecommons.tankerkoenig.de/#register. This function can't work without it"); 
        my $r="err no APIKEY";
        return $r;
    }
@@ -955,14 +956,23 @@ Spritpreis_ParsePricesForIDs(@){
 sub
 Spritpreis_GetCoordinatesForAddress(@){
     my ($hash, $address)=@_;
+#address is: "41363 DE de en"
+    my @parts=split(" ", $address);
+    my $zipcode=$parts[0];      #41363    
+    my $zipcountry=$parts[1];    #DE
+    my $country=$parts[2];      #de
+    my $lang="en";
     
     my $result;
 
 #alternatively use goecode.farm, no API key, 250 requests allowed per day per IP
 # https://www.geocode.farm/v3/json/forward/?addr=41363+DE&country=de&lang=en&count=1
 
-    my $url=new URI::URL 'https://maps.google.com/maps/api/geocode/json';
-    $url->query_form("address",$address);
+    #my $url=new URI::URL 'https://maps.google.com/maps/api/geocode/json';
+    my $url=new URI::URL 'https://www.geocode.farm/v3/json/forward/'; #/?addr=';
+    #$url->query_form("address",$address);
+    $url.="?addr=".$zipcode."+".$zipcountry."+".$country."&lang=".$lang."&count=1";
+
     Log3($hash, 3, "$hash->{NAME}: request URL: ".$url);
 
     my $param= {
@@ -974,26 +984,84 @@ Spritpreis_GetCoordinatesForAddress(@){
     my ($err, $data)=HttpUtils_BlockingGet($param);
 
     if($err){
-        Log3($hash, 4, "$hash->{NAME}: error fetching nformation");
+        Log3($hash, 4, "$hash->{NAME}: error fetching nformation: $err");
     } elsif($data){
         Log3($hash, 4, "$hash->{NAME}: got CoordinatesForAddress reply");
         Log3($hash, 5, "$hash->{NAME}: got data $data\n\n\n");
-
+=pod
+    "geocoding_results": {
+        "LEGAL_COPYRIGHT": {
+            "copyright_notice": "Copyright (c) 2020 Geocode.Farm - All Rights Reserved.",
+            "copyright_logo": "https:\/\/www.geocode.farm\/images\/logo.png",
+            "terms_of_service": "https:\/\/www.geocode.farm\/policies\/terms-of-service\/",
+            "privacy_policy": "https:\/\/www.geocode.farm\/policies\/privacy-policy\/"
+        },
+        "STATUS": {
+            "access": "FREE_USER, ACCESS_GRANTED",
+            "status": "SUCCESS",
+            "address_provided": "DE 41363 de",
+            "result_count": 1
+        },
+        "ACCOUNT": {
+            "ip_address": "185.22.143.165",
+            "distribution_license": "NONE, UNLICENSED",
+            "usage_limit": "250",
+            "used_today": "3",
+            "used_total": "7",
+            "first_used": "19 Jan 2020"
+        },
+        "RESULTS": [
+            {
+                "formatted_address": "41363, NW, Germany, Germany",
+                "accuracy": "EXACT_MATCH",
+                "ADDRESS": {
+                    "locality": "Jüchen",
+                    "admin_2": "Neuss",
+                    "admin_1": "NW",
+                    "postal_code": "41363",
+                    "country": "Germany"
+                },
+                "LOCATION_DETAILS": {
+                    "elevation": "UNAVAILABLE",
+                    "timezone_long": "UNAVAILABLE",
+                    "timezone_short": "Europe\/Berlin"
+                },
+                "COORDINATES": {
+                    "latitude": "51.0963668823837",
+                    "longitude": "6.49109697341106"
+                },
+                "BOUNDARIES": {
+                    "northeast_latitude": "51.0341796883614",
+                    "northeast_longitude": "6.42736005783105",
+                    "southwest_latitude": "51.1585502624838",
+                    "southwest_longitude": "6.59425020211080"
+                }
+            }
+        ],
+        "STATISTICS": {
+            "https_ssl": "ENABLED, SECURE",
+            "time_taken": "0.69019603729248"
+        }
+    }
+=cut
         eval {
             $result = JSON->new->utf8(1)->decode($data);
         };
         if ($@) {
             Log3 ($hash, 4, "$hash->{NAME}: error decoding response $@");
         } else {
-            if ($result->{status} eq "ZERO_RESULTS"){
-                return(0,0,"error: could not find address");
-            }else{
-                my $lat=$result->{results}->[0]->{geometry}->{location}->{lat};
-                my $lon=$result->{results}->[0]->{geometry}->{location}->{lng};
-                my $formattedAddress=$result->{results}->[0]->{formatted_address};
+            if ($result->{STATUS}->{status} ne "SUCCESS"){
+                return(0,0,"error: could not find address: ".$result->{STATUS}->{status});
+            }elsif ($result->{geocoding_results}->{STATUS}->{status} eq "SUCCESS"){
+                my $lat=$result->{geocoding_results}->{RESULTS}->{COORDINATES}->{latitude};
+                my $lon=$result->{geocoding_results}->{RESULTS}->{COORDINATES}->{longitude};
+                my $formattedAddress=$result->{geocoding_results}->{RESULTS}->{formatted_address} ;
 
                 Log3($hash,3,"$hash->{NAME}: got coordinates for address as lat: $lat, lon: $lon");
                 return ($lat, $lon, $formattedAddress);
+            }
+            else{
+                 Log3($hash,3,"$hash->{NAME}: status result: ".$result->{STATUS}->{status});
             }
         }         
     }else {
