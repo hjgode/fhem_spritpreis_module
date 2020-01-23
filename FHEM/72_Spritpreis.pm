@@ -638,7 +638,7 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
 #
 #####################################
 
-#NOT_USED gives SSL wants a read first
+#NOT_USED gives 'SSL wants a read first'
 sub
 GetStationIDsForLocation_callback(@){
     my ($param, $err, $data) = @_;
@@ -977,7 +977,7 @@ Spritpreis_GetCoordinatesForAddress(@){
 
     my $param= {
     url      => $url,
-    timeout  => 1,
+    timeout  => 3,
     method   => "GET",
     header   => "User-Agent: fhem\r\nAccept: application/json",
     };
@@ -1041,7 +1041,7 @@ Spritpreis_GetCoordinatesForAddress(@){
         "STATISTICS": {
             "https_ssl": "ENABLED, SECURE",
             "time_taken": "0.69019603729248"
-        }
+        }geo
     }
 =cut
         eval {
@@ -1050,18 +1050,16 @@ Spritpreis_GetCoordinatesForAddress(@){
         if ($@) {
             Log3 ($hash, 4, "$hash->{NAME}: error decoding response $@");
         } else {
-            if ($result->{STATUS}->{status} ne "SUCCESS"){
-                return(0,0,"error: could not find address: ".$result->{STATUS}->{status});
-            }elsif ($result->{geocoding_results}->{STATUS}->{status} eq "SUCCESS"){
-                my $lat=$result->{geocoding_results}->{RESULTS}->{COORDINATES}->{latitude};
-                my $lon=$result->{geocoding_results}->{RESULTS}->{COORDINATES}->{longitude};
-                my $formattedAddress=$result->{geocoding_results}->{RESULTS}->{formatted_address} ;
+            if ($result->{geocoding_results}->{STATUS}->{status} eq "SUCCESS"){
+                my $lat=$result->{geocoding_results}{RESULTS}[0]{COORDINATES}{latitude};
+                my $lon=$result->{geocoding_results}->{RESULTS}[0]{COORDINATES}->{longitude};
+                my $formattedAddress=$result->{geocoding_results}->{RESULTS}[0]{formatted_address} ;
 
                 Log3($hash,3,"$hash->{NAME}: got coordinates for address as lat: $lat, lon: $lon");
                 return ($lat, $lon, $formattedAddress);
-            }
-            else{
+            }else {
                  Log3($hash,3,"$hash->{NAME}: status result: ".$result->{STATUS}->{status});
+                return(0,0,"error: could not find address: ".$result->{STATUS}->{status});
             }
         }         
     }else {

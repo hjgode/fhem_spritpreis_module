@@ -28,6 +28,9 @@ b postpone main::Spritpreis_Set
 s
     single step
 
+c <linenumber current file>
+	continue until line number reached and break
+	
 x $hash
     zeigt inhalt von variable $hash
 
@@ -36,6 +39,13 @@ R
 
 l main::Spritpreis_Tankerkoenig_GetStationIDsForLocation
     list source code
+	
+d <number:line>
+	delete breakpoint
+
+DB
+	delete all breakpoints
+	
 
 ####################################
 
