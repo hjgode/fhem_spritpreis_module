@@ -43,7 +43,7 @@ l main::Spritpreis_Tankerkoenig_GetStationIDsForLocation
 d <number:line>
 	delete breakpoint
 
-DB
+D
 	delete all breakpoints
 	
 
