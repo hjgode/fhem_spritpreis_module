@@ -137,7 +137,7 @@ sub
 Spritpreis_Set(@) {
     my ($hash , $name, $cmd, @args) = @_;
     return "Unknown command $cmd, choose one of update add delete" if ($cmd eq '?');
-    Log3($hash, 3,"$hash->{NAME}: get $hash->{NAME} $cmd $args[0]");
+    Log3($hash, 3,"$hash->{NAME}: set $hash->{NAME} $cmd $args[0]");
 
     if ($cmd eq "update"){
         if(defined $args[0]){
@@ -186,6 +186,78 @@ Spritpreis_Set(@) {
         # 
         # not sure how to "remove" readings through the fhem api
         #
+=pod
+    for delete, the internal stationid must be deleted and all related readings starting with <digit>_
+    for example to iterate thru all readings use the $hash variable: $hash->{READINGS}
+
+  'CL' => {
+    'Authenticated' => 0,
+    'BUF' => '',
+    'CD' => bless( \*Symbol::GEN9, 'IO::Socket::INET' ),
+    'FD' => 7,
+    'FW_ID' => '28',
+...
+    'canAsyncOutput' => 1
+  },
+  'DEF' => 'Tankerkoenig 3f1788aa-240e-b74c-22ea-bd126a1c49f1',
+  'NAME' => 'BenzinPreise',
+  'NR' => 26,
+  'NTFY_ORDER' => '50-BenzinPreise',
+  'READINGS' => {
+    '0_brand' => {
+      'TIME' => '2020-01-20 22:08:13',
+      'VAL' => 'Shell'
+    },
+    '0_diesel_price' => {
+      'TIME' => '2020-01-20 22:08:13',
+      'VAL' => '1.30'
+    },
+    '0_diesel_trend' => {
+      'TIME' => '2020-01-20 22:07:35',
+      'VAL' => 'steigt'
+    },
+...
+    '0_id' => {
+      'TIME' => '2020-01-20 22:08:13',
+      'VAL' => 'fa6624d4-7bb9-4b17-9e56-31e0040428d1'
+    },
+...
+=cut
+        #input is set <device> delete <station_id>
+        #find the reading prefix for stationid
+        my $foundprefix="";
+        my $theID=$args[0];
+        my $key; my $value;
+        if(undef eq $theID || $theID eq ''){
+            return "delete needs a station id to delete";
+        }
+        for (keys %{ $hash->{READINGS} }) 
+        {
+            $value = $hash->{READINGS}{$_}{VAL};
+            if($value eq $theID){
+                Log3($hash, 5, "found station id to delete: $_"); # ie found station id to delete: 0_id
+                $foundprefix=$_;
+                last: #break loop
+            }
+        }
+        #TODO delete station id from id attr list
+        if($foundprefix ne ''){
+            my $indx=index $foundprefix, "_";
+            if($indx != -1){
+                my $prefix=substr($foundprefix, 0, ++$indx);
+                #delete all readings starting with prefix
+                my $cnt=0;
+                for ( keys %{ $hash->{READINGS} } ) {
+                    if(substr($_,0,$indx) eq $prefix){
+                        Log3($hash,5, "delete $_");
+                        $cnt++;
+                    }
+                }
+                return "deleted $cnt readings starting with $prefix";
+            }else{
+                return "no _ found in prefix";
+            }
+        }
         #my $msg="delete is not implemented yet";
         #return "$hash $name => $msg"; #shows dialog with msg and OK, shows new page 
         return "<html><body><h1>ERROR</h1>delete is not implemented yet</body></html>";
@@ -244,14 +316,9 @@ Spritpreis_Get(@) {
         }elsif ($str ne ''){
           Log3($hash,4,"$hash->{NAME}: Calling GetCoordinatesForAddress with $hash, $str");
           @loc=Spritpreis_GetCoordinatesForAddress($hash, $str);
-          my ($lat, $lon, $str)=@loc;
+          my ($lat1, $lon1, $str1)=@loc;
+          return "location for address: $lat1, $lon1, $str1";
         }
-#		else{
-#            if($hash->{helper}->{service} eq "Tankerkoenig"){
-#                $ret=Spritpreis_Tankerkoenig_GetStationIDsForLocation($hash, @loc);
-#                return $ret;
-#            }
-#        }
 		else{
 			return "unable to search for '$str'";
 		}
@@ -1055,7 +1122,7 @@ Spritpreis_GetCoordinatesForAddress(@){
                 my $lon=$result->{geocoding_results}->{RESULTS}[0]{COORDINATES}->{longitude};
                 my $formattedAddress=$result->{geocoding_results}->{RESULTS}[0]{formatted_address} ;
 
-                Log3($hash,3,"$hash->{NAME}: got coordinates for address as lat: $lat, lon: $lon");
+                Log3($hash,3,"$hash->{NAME}: got coordinates for address $formattedAddress as lat: $lat, lon: $lon");
                 return ($lat, $lon, $formattedAddress);
             }else {
                  Log3($hash,3,"$hash->{NAME}: status result: ".$result->{STATUS}->{status});
