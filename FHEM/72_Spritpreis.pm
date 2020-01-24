@@ -136,7 +136,7 @@ Spritpreis_Undef(@){
 sub
 Spritpreis_Set(@) {
     my ($hash , $name, $cmd, @args) = @_;
-    return "Unknown command $cmd, choose one of update add delete" if ($cmd eq '?');
+    return "Unknown command $cmd, choose one of update add delete " if ($cmd eq '?');
     Log3($hash, 3,"$hash->{NAME}: set $hash->{NAME} $cmd $args[0]");
 
     if ($cmd eq "update"){
@@ -235,7 +235,7 @@ Spritpreis_Set(@) {
         {
             $value = $hash->{READINGS}{$_}{VAL};
             if($value eq $theID){
-                Log3($hash, 5, "found station id to delete: $_"); # ie found station id to delete: 0_id
+                Log3($hash, 5, "found prefix $_ for station id ($theID) to delete"); # ie found station id to delete: 0_id
                 $foundprefix=$_;
                 last: #break loop
             }
@@ -250,9 +250,30 @@ Spritpreis_Set(@) {
                 for ( keys %{ $hash->{READINGS} } ) {
                     if(substr($_,0,$indx) eq $prefix){
                         Log3($hash,5, "delete $_");
+						delete $hash->{READINGS}->{$_};
                         $cnt++;
                     }
                 }
+#$DB::single = 1; #break in debugger				
+				# look for the station id in attr IDs and remove that from the attr
+				my $attrIDs=AttrVal($hash->{'NAME'}, "IDs",'');
+				Log3($hash,5,"delete: read attr IDs=".$attrIDs);
+				if($attrIDs ne ''){
+					$indx=index $attrIDs, $theID;
+					if($indx != -1){
+						my @listIDs=split(",", $attrIDs);
+						my $newList="";
+						foreach (@listIDs){
+							if ($_ ne $theID){
+								Log3($hash,5,"found id $theID in attr, remove ...");
+								$newList.=$_.",";
+							}
+							$newList=substr($newList,0,-1);
+							$attr{$name}{IDs}=$newList;
+							Log3($hash,5,"newList is $newList");
+						}
+					}
+				}
                 return "deleted $cnt readings starting with $prefix";
             }else{
                 return "no _ found in prefix";
@@ -262,7 +283,7 @@ Spritpreis_Set(@) {
         #return "$hash $name => $msg"; #shows dialog with msg and OK, shows new page 
         return "<html><body><h1>ERROR</h1>delete is not implemented yet</body></html>";
     }
-    return "undef";
+    return "";
 }
 
 sub
@@ -650,9 +671,16 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
               return $ret;
             }
             my ($stations) = $result->{stations};
-            #my $ret="<html><p><h3>Stations for Address</h3></p><p><h2>$formattedAddress</h2></p><table><tr><td>Name</td><td>Ort</td><td>Straße</td></tr>";
-            my $ret="<html><header><meta charset='UTF-8'></header><body><p><h3>Stations for Address</h3></p><p><h2>$lat $lng $rad</h2></p><table><tr><td>Name</td><td>Ort</td><td>Stra&szlig;e</td></tr>";
 			my $stationlist=""; # store stations with id, brand, name, place
+            #my $ret="<html><p><h3>Stations for Address</h3></p><p><h2>$formattedAddress</h2></p><table><tr><td>id</td><td>Name</td><td>Ort</td><td>Straße</td></tr>";
+            my $ret="<html><header><meta charset='UTF-8'></header><body><p><h3>Stations for Address</h3></p><p><h2>$lat $lng $rad</h2></p>";
+			$ret.="<table><tr>";
+			$ret.="<td>id</td>";
+			$ret.="<td>brand</td>";
+			$ret.="<td>Name</td>";
+			$ret.="<td>Ort</td>";
+			$ret.="<td>Stra&szlig;e</td>";
+			$ret.="</tr>";
             foreach (@{$stations}){
                 (my $station)=$_;
 #fhem?cmd=set+%3Ca%20href=%27/fhem?detail=BenzinPreise%27%3EBenzinPreise%3C/a%3E+add+id+1b52f84f-03cc-457c-bf76-dcbe5fd3eb33
@@ -661,42 +689,47 @@ Spritpreis_Tankerkoenig_GetStationIDsForLocation(@){
 #$DB::single = 1; #break in debugger
 
                 Log3($hash, 2, "Name: $station->{name}, id: $station->{id}");
-                $ret=$ret . "<tr><td><a href=\"http://" . 
-                            $headerHost[0] . 
-                            "/fhem?cmd=set+" . 
-                            $devicename .
-                            #"BenzinPreise". 
-                            "+add+id+" . 
-                            $station->{id} . 
-                            "\"  target=\"_blank\" >add $station->{id}</a>";
-                Log3 ($hash, 5, "$hash->{NAME}: link="."<tr><td><a href=\"http://" . 
-                            $headerHost[0] . 
-                            "/fhem?cmd=set+" . 
-                            #$devicename ."+"
-                            "BenzinPreise". 
-                            "+add+id+" . 
-                            $station->{id} . 
-                            "\">add</a>");
-                $ret=$ret . $station->{name} . "</td><td>" . $station->{place} . "</td><td>" . $station->{street} . " " . $station->{houseNumber} . "</td></tr>";
+                $ret.="<tr><td>" . $station->{id} . "</td>";
+                $ret.="<td>".$station->{brand} . "</td>";
+				$ret.="<td>".$station->{name} . "</td>";
+				$ret.="<td>".$station->{place} . "</td>";
+				$ret.="<td>".$station->{street} . "</td>";
+				$ret.="</tr>";
+				$stationlist.= $station->{id} . $station->{brand}."\n";
+				$stationlist.=$station->{place}." ".$station->{street}." ".$station->{houseNumber}."\n";
+            }
+            $ret=$ret . "</table></body></html>";
+=pod
+#### another option: try using a html form
+            my $ret="<html><form action=fhem/cmd?set ".$hash->{NAME}." station method='get'><select multiple name='id'>";
+            foreach (@{$stations}){
+                (my $station)=$_;
+
+                #Log3($hash, 5, "$hash->{NAME}: Station hash:".Dumper($station));
+                Log3($hash, 2, "Name: $station->{name}, id: $station->{id}");
+                $ret=$ret."<option value=".$station->{id}.">".$station->{name}." ".$station->{place}." ".$station->{street}." ".$station->{houseNumber}."</option>";
 				$stationlist.=$station->{id}." ";
 				$stationlist.=$station->{brand}."\n";
 				$stationlist.=$station->{place}." ".$station->{street}." ".$station->{houseNumber}."\n";
             }
-            $ret=$ret . "</table></body></html>";
+            $ret=$ret."<button type='submit'>submit</button></html>";
+##### end html form
+=cut
             my $utf8 = encode("utf-8", $ret);
             Log3($hash,2,"$hash->{NAME}: ############# ret: $utf8");
 			#update reading stations_found
+=pod
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate($hash,"stations_found", encode("utf-8", $stationlist));
 			readingsEndUpdate($hash,1);
+=cut
             return $utf8;
         }         
     }else {
         Log3 ($hash, 4, "$hash->{NAME}: something's very odd");
     }
     return $data; 
-    # InternalTimer(gettimeofday()+AttrVal($hash->{NAME}, "interval",15)*60, "Spritpreis_Tankerkoenig_GetPricesForLocation",$hash);
-    return undef;
+    # InternalTimer(gettimeofday()+AttrVal($hash->{NAME}, "interval",15)*60, "Spritpreis_Tankerkoenig_GetPricesForLocation",$hash);    
 }
 
 #####################################
@@ -745,6 +778,7 @@ GetStationIDsForLocation_callback(@){
             }
             my ($stations) = $result->{stations};
             #my $ret="<html><p><h3>Stations for Address</h3></p><p><h2>$formattedAddress</h2></p><table><tr><td>Name</td><td>Ort</td><td>Straße</td></tr>";
+
             my $ret="<html><header><meta charset='UTF-8'></header><body><p><h3>Stations for Address</h3></p><p><h2>$lat $lng $rad</h2></p><table><tr><td>Name</td><td>Ort</td><td>Stra&szlig;e</td></tr>";
             foreach (@{$stations}){
                 (my $station)=$_;
@@ -773,6 +807,7 @@ GetStationIDsForLocation_callback(@){
                 $ret=$ret . $station->{name} . "</td><td>" . $station->{place} . "</td><td>" . $station->{street} . " " . $station->{houseNumber} . "</td></tr>";
             }
             $ret=$ret . "</table></body></html>";
+			
             my $utf8 = encode("utf-8", $ret);
             Log3($hash,2,"$hash->{NAME}: ############# ret: $utf8");
             #return $utf8; #this will not show a new dialog as we are in a callback
@@ -970,6 +1005,9 @@ Spritpreis_Tankerkoenig_ParsePricesForIDs(@){
 }
 
 #@NOT_USED
+#############################################
+# parse function callback for nonBlockingGet
+#############################################
 sub
 Spritpreis_Tankerkoening_ParseStationIDsForLocation(@){
     my ($hash, $err, $data)=@_;
@@ -1383,5 +1421,196 @@ all
 
 =end html
 
+=begin html_DE
+
+<a name="Spritpreis"></a>
+<div> 
+<h1>FHEM Spritpreis Modul</h1>
+<p>Name: 72_Spritpreis.pm</p>
+keine deutsche Hilfe
+<h2>Installation</h2>
+<p>Copy modul file 72<em>Spritpreis.pm to FHEM directory. libjson-perl should be installed for perl. Enter cmd &quot;reload 72</em>Spritpreis.pm&quot; in fhem web or restart fhem.</p>
+<h2>Add new device for Spritprpeis</h2>
+<p>In fhem web cmd enter: &quot;define spritpreis Spritpreis Tankerkoenig 0000-0000-...&quot;, where 0000-0000-... is your api key you got from https://creativecommons.tankerkoenig.de/</p>
+<h2>Add new station</h2>
+<p>To watch the prices for a station, locate the station ID with the help of https://creativecommons.tankerkoenig.de/TankstellenFinder/index.html or the current helper at https://creativecommons.tankerkoenig.de/.
+For example an Aral station in Neuss gives following tankerkoenig station information:</p>
+<pre><code>[
+  {
+    &quot;id&quot;: &quot;127035c1-a7c7-41db-9976-ab4cd14b7271&quot;,
+    &quot;name&quot;: &quot;Aral Tankstelle&quot;,
+    &quot;brand&quot;: &quot;ARAL&quot;,
+    &quot;street&quot;: &quot;Engelbertstraße&quot;,
+    &quot;house_number&quot;: &quot;&quot;,
+    &quot;post_code&quot;: 41462,
+    &quot;place&quot;: &quot;Neuss&quot;,
+    &quot;lat&quot;: 51.2071037,
+    &quot;lng&quot;: 6.671111,
+    &quot;isOpen&quot;: true
+  }
+]  
+</code></pre>
+
+<p>Add the station ID by using the set function inside the detail view of the Spritpreis device you have created:</p>
+<pre><code>set &lt;device_name&gt; add id 127035c1-a7c7-41db-9976-ab4cd14b7271
+</code></pre>
+
+<p>This will add the station and update the readings in the Spritpreis device.</p>
+<p>Alternately you can add the station ID as an attribute using</p>
+<pre><code>attr &lt;device_name&gt; IDs &quot;127035c1-a7c7-41db-9976-ab4cd14b7271&quot;
+</code></pre>
+
+<p>and then use &quot;set <device_name> test&quot; in web cmd view.</p>
+<p>The readings will show prefixed by the order number of the added IDs. For example:</p>
+<pre><code>0_brand
+0_e10_price
+...
+1_brand
+1_e10_price
+...
+</code></pre>
+
+<h2>Reference</h2>
+<p>The source type Spritpreisrechner is not implemented, does only support geolocations. Only Tankerkoenig is implemented.</p>
+<p>define <em>device<em>name</em> Spritpreis <em>price</em>source</em> <em>api_key</em></p>
+<blockquote>
+<p>device_name</p>
+<blockquote>
+<p>name of the newly created fhem device</p>
+</blockquote>
+<p>price_source</p>
+<blockquote>
+<p>either Tankerkoenig or ~~Spritpreisrechner~~</p>
+<p>for Tankerkoenig the &lt;api-key&gt; argument is mandatory, 
+~~for Spritpreisrechner no additional argument needed~~</p>
+</blockquote>
+<p>api-key: the api key you got from Tankerkoenig</p>
+</blockquote>
+<h3>set <device_name></h3>
+<h4>update</h4>
+<blockquote>
+<p>update one or more station readings provided by their station IDs</p>
+<blockquote>
+<p>-none-:</p>
+<blockquote>
+<p>default, if no argument is given, all stations are updated</p>
+</blockquote>
+<p>id &lt;station_id(s)&gt;</p>
+<p>examples</p>
+<blockquote>
+<p>set <device_name> update</p>
+<blockquote>
+<p>updates all defined stations</p>
+</blockquote>
+<p>set <device_name> update id</p>
+<blockquote>
+<p>updates all defined stations</p>
+</blockquote>
+<p>set <device_name> update id 127035c1-a7c7-41db-9976-ab4cd14b7271</p>
+<p>set <device_name> update id 127035c1-a7c7-41db-9976-ab4cd14b7271,12121212-1212-1212-1212-121212121212</p>
+</blockquote>
+</blockquote>
+<p>all</p>
+<blockquote>
+<p>updates the reading for all defined station IDs</p>
+<p>example</p>
+<blockquote>
+<p>set <device_name> update all</p>
+</blockquote>
+</blockquote>
+</blockquote>
+<h4>add</h4>
+<blockquote>
+<p>add id <station_id></p>
+<blockquote>
+<p>adds the station with ID to the list of stations</p>
+</blockquote>
+</blockquote>
+<h4>delete</h4>
+<blockquote>
+<pre><code>not implemented yet
+</code></pre>
+
+</blockquote>
+<h3>get</h3>
+<h4>search</h4>
+<blockquote>
+<p>Google location search is not usable without an api-key<br>
+example: set <i>device_name</i> search <i>lat</i> <i>lon</i> <i>rad</i><br>
+where location is lat/lon and search radius in km provided as <i>rad</i> </p>
+</blockquote>
+<h4>test</h4>
+<blockquote>
+<p>will populate the internal station ID list by the IDs entered as attribut</p>
+</blockquote>
+<h2>attributs</h2>
+<h3>IDs</h3>
+<blockquote>
+<p>list of IDs to be used, will update internal list, when fhem starts or
+when set <device_name> test is used</p>
+</blockquote>
+<h3>interval</h3>
+<blockquote>
+<p>how often the data is requested in minutes interval, please do not
+stress the host! Default is 15 minutes.</p>
+</blockquote>
+<h3>lat</h3>
+<blockquote>
+<p>not used</p>
+</blockquote>
+<h3>lon</h3>
+<blockquote>
+<p>not used</p>
+</blockquote>
+<h3>rad</h3>
+<blockquote>
+<p>not used</p>
+</blockquote>
+<h3>type</h3>
+<blockquote>
+<pre><code>not used: which prices are of interrest
+</code></pre>
+
+<blockquote>
+<pre><code>e5
+e10
+diesel
+all
+</code></pre>
+
+</blockquote>
+</blockquote>
+<h4>sortby</h4>
+<blockquote>
+<p>not used</p>
+</blockquote>
+<h4>apikey</h4>
+<blockquote>
+<p>not used, see define</p>
+</blockquote>
+<h4>address</h4>
+<pre><code>not used    
+</code></pre>
+
+<h4>priceformat</h4>
+<blockquote>
+<p>2dezCut</p>
+<blockquote>
+<p>cut decimals after two digits</p>
+</blockquote>
+<p>2dezRound</p>
+<blockquote>
+<p>round decimal to tow digits</p>
+</blockquote>
+<p>3dez</p>
+<blockquote>
+<p>report three decimal digits</p>
+</blockquote>
+</blockquote>
+
+</div>
+
+
+=end html_DE
 
 =cut--

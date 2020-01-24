@@ -33,6 +33,7 @@ c <linenumber current file>
 	
 x $hash
     zeigt inhalt von variable $hash
+	use x @name to show array content
 
 R
     Rerun
@@ -51,3 +52,7 @@ D
 
 main::Spritpreis_Set(./FHEM/72_Spritpreis.pm:138):
 
+####################################
+#Notes
+
+perl debug will be flood by fhem with "cmd help %20DE" output, if help part of modul does not provide html_DE section
