@@ -136,7 +136,7 @@ Spritpreis_Undef(@){
 sub
 Spritpreis_Set(@) {
     my ($hash , $name, $cmd, @args) = @_;
-    return "Unknown command $cmd, choose one of update add delete " if ($cmd eq '?');
+    return "Unknown command $cmd, choose one of update add delete" if ($cmd eq '?');
     Log3($hash, 3,"$hash->{NAME}: set $hash->{NAME} $cmd $args[0]");
 
     if ($cmd eq "update"){
@@ -145,11 +145,11 @@ Spritpreis_Set(@) {
                 # removing the timer so we don't get a flurry of requests
                 RemoveInternalTimer($hash);
                 Spritpreis_Tankerkoenig_updateAll($hash);
-                return; #reload page
+                return "updating all prices. $hash->{NAME}";
             }elsif($args[0] eq "id"){
                 if(defined $args[1]){
                     Spritpreis_Tankerkoenig_updatePricesForIDs($hash, $args[1]);
-                    return;# will reload page
+                    return "updating prices for $args[1]. $hash->{NAME}";
                 }else{
                     my $r="update id requires an id parameter!";
                     Log3($hash, 2,"$hash->{NAME} $r");
@@ -161,7 +161,7 @@ Spritpreis_Set(@) {
             # default behaviour if no ID or "all" is given is to update all existing IDs
             #
             Spritpreis_Tankerkoenig_updateAll($hash); 
-            return; #reload page
+            return "update all (default) called for $hash->{NAME}"; #reload page
         }
     }elsif($cmd eq "add"){
         if(defined $args[0]){
@@ -171,15 +171,17 @@ Spritpreis_Set(@) {
                 # add station by providing a single Tankerkoenig ID
                 #
                 if(defined($args[1])){
+                    #includes an async call
                     Spritpreis_Tankerkoenig_GetDetailsForID($hash, $args[1]);
-                    return;
+                    return "adding $args[1] to stations. Please manually add this ID to attr IDs for permanent watching. $hash->{NAME}";
                 }else{
+                    #show dialog
                     my $ret="<html><body><h1>ERROR</h1>add by id requires a station id</body></html>";
                     return $ret;
                 }
             }
         }else{
-            my $ret="add requires id or (some other method here soon)";
+            my $ret="add requires id. $hash->{NAME}";
             return $ret;
         }
     }elsif($cmd eq "delete"){
@@ -229,7 +231,7 @@ Spritpreis_Set(@) {
         my $theID=$args[0];
         my $key; my $value;
         if(undef eq $theID || $theID eq ''){
-            return "delete needs a station id to delete";
+            return "delete needs a station id to delete. $hash->{NAME}";
         }
         for (keys %{ $hash->{READINGS} }) 
         {
@@ -240,7 +242,6 @@ Spritpreis_Set(@) {
                 last: #break loop
             }
         }
-        #TODO delete station id from id attr list
         if($foundprefix ne ''){
             my $indx=index $foundprefix, "_";
             if($indx != -1){
@@ -274,16 +275,21 @@ Spritpreis_Set(@) {
 						}
 					}
 				}
-                return "deleted $cnt readings starting with $prefix";
+                my $ret="deleted $cnt readings starting with $prefix";
+                return "$hash->{NAME} => $ret";
             }else{
-                return "no _ found in prefix";
+                return "no _ found in prefix. $hash->{NAME}";
             }
+        }else{
+            return "not found station to delete. $hash->{NAME}";
         }
         #my $msg="delete is not implemented yet";
         #return "$hash $name => $msg"; #shows dialog with msg and OK, shows new page 
-        return "<html><body><h1>ERROR</h1>delete is not implemented yet</body></html>";
+#        return "<html><body><h1>ERROR</h1>delete is not implemented yet</body></html>";
+    }# if cmd=delete
+    else{
+        return "cmd not supported";
     }
-    return "";
 }
 
 sub
@@ -341,9 +347,19 @@ Spritpreis_Get(@) {
           return "location for address: $lat1, $lon1, $str1";
         }
 		else{
+            #use attr values for lat, lon, rad
+            $lat=AttrVal($hash->{'NAME'}, "lat",'');
+            $lon=AttrVal($hash->{'NAME'}, "lon",'');
+            $rad=AttrVal($hash->{'NAME'}, "rad",'');
+            if($lat ne '' && $lon ne '' && $rad ne ''){
+              Log3($hash,4,"$hash->{NAME}: Calling GetStationIDsForLocation with $lat, $lon, $rad read from attr");
+              @loc=($lat, $lon, $rad);#=@loc; #store vals in array
+              $ret=Spritpreis_Tankerkoenig_GetStationIDsForLocation($hash, @loc);
+              return $ret;
+            }
 			return "unable to search for '$str'";
 		}
-    }elsif($cmd eq "test"){
+    }elsif($cmd eq "test"){ # this will test the current station IDs and get the details
             $ret=Spritpreis_Tankerkoenig_populateStationsFromAttr($hash);
             return $ret;
 
@@ -914,7 +930,8 @@ Spritpreis_Tankerkoenig_ParseDetailsForID(@){
                 }
             }
             readingsBulkUpdate($hash,$i."_place",encode("utf-8", $station->{place}));
-            readingsBulkUpdate($hash,$i."_street",encode("utf-8", $station->{street})." ".encode("utf-8", $station->{houseNumber}));
+            readingsBulkUpdate($hash,$i."_street",encode("utf-8", $station->{street}));
+            readingsBulkUpdate($hash,$i."_housenumber",encode("utf-8", $station->{houseNumber}));
             readingsBulkUpdate($hash,$i."_distance",encode("utf-8", $station->{dist}));
             readingsBulkUpdate($hash,$i."_brand",encode("utf-8", $station->{brand}));
             readingsBulkUpdate($hash,$i."_lat",encode("utf-8", $station->{lat}));
